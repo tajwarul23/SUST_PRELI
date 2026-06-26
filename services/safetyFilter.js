@@ -20,12 +20,7 @@ const GENERIC_FALLBACKS = {
     bn: "আমাদের সাথে যোগাযোগ করার জন্য ধন্যবাদ। আমরা আপনার অভিযোগটি পেয়েছি এবং আমাদের টিম এটি তদন্ত করছে। প্রযোজ্য ক্ষেত্রে যেকোনো যোগ্য পরিমাণ অফিসিয়াল চ্যানেলের মাধ্যমে ফেরত দেওয়া হবে।"
 };
 
-/**
- * Scans a reply for violations and returns a safe version.
- * @param {string} reply - The generated customer reply.
- * @param {string} language - Language code ('en'|'bn'|'mixed').
- * @returns {string} - The original or sanitized reply.
- */
+
 function applySafetyFilter(reply, language = 'en') {
     const lang = language === 'bn' ? 'bn' : 'en';
 
