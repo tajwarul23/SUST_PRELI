@@ -1,10 +1,4 @@
-/**
- * safetyFilter.js
- * 
- * Why: Automated replies carry reputational and security risks.
- * This filter prevents leaking sensitive instructions or making
- * unauthorized promises (like "I will refund you now").
- */
+
 
 const VIOLATIONS = [
     {
