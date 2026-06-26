@@ -1,7 +1,14 @@
 import Groq from "groq-sdk";
 import { aiResponseSchema } from '../schemas/aiResponseSchema.js';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+function getGroqClient() {
+    const apiKey = process.env.GROQ_API_KEY?.trim();
+    if (!apiKey) {
+        throw new Error('GROQ_API_KEY is missing');
+    }
+
+    return new Groq({ apiKey });
+}
 
 async function classifyWithGroq(ticketData, preAnalysis) {
     const { complaint, language, user_type, transaction_history = [] } = ticketData;
@@ -118,11 +125,14 @@ Vague complaint (insufficient data):
     const userPrompt = `User Complaint: "${complaint}"`;
 
     const timeoutThreshold = parseInt(process.env.FALLBACK_THRESHOLD_MS || "5000");
-    const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Groq timeout reached")), timeoutThreshold)
-    );
 
     try {
+        const groq = getGroqClient();
+        let timeoutId;
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error("Groq timeout reached")), timeoutThreshold);
+        });
+
         const result = await Promise.race([
             groq.chat.completions.create({
                 model: "openai/gpt-oss-120b",
@@ -136,8 +146,9 @@ Vague complaint (insufficient data):
             timeoutPromise
         ]);
 
+        clearTimeout(timeoutId);
+
         const responseText = result.choices[0].message.content;
-        console.log("groq response", responseText);
 
         const parsed = aiResponseSchema.safeParse(JSON.parse(responseText));
         if (!parsed.success) {

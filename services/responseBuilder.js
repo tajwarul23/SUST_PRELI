@@ -1,11 +1,3 @@
-/**
- * responseBuilder.js
- * 
- * Why: This module serves as the "single source of truth" for the API response shape.
- * By funneling both the Gemini-powered path and the rules-based fallback through this function,
- * we guarantee that the API contract is never broken, even if one path has a bug or missing field.
- */
-
 import { z } from 'zod';
 
 const responseSchema = z.object({
@@ -28,11 +20,6 @@ const responseSchema = z.object({
     reason_codes: z.array(z.string())
 });
 
-/**
- * Builds and validates the final response object.
- * @param {Object} data - The raw data from either Gemini or Fallback.
- * @returns {Object} - Validated response object.
- */
 function buildResponse(data) {
     const rawData = {
         ticket_id: data.ticket_id || 'unknown',
@@ -49,8 +36,6 @@ function buildResponse(data) {
         reason_codes: data.reason_codes || []
     };
 
-    // Validate against schema. If it fails, Zod will throw an informative error.
-    // In production, you might want to wrap this in a try/catch and return a safe default.
     return responseSchema.parse(rawData);
 }
 

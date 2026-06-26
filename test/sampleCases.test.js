@@ -1,10 +1,3 @@
-/**
- * testCases.js
- * 
- * Why: This is a validation harness to ensure the logic works as expected.
- * It simulates a series of POST requests and checks the output.
- */
-
 const SAMPLE_CASES = [
     {
         name: "Failed Payment - English",
@@ -113,7 +106,6 @@ async function runTests() {
 
             const data = await response.json();
 
-            // Basic validation
             let caseMatch = data.case_type === test.expected.case_type;
             let verdictMatch = test.expected.evidence_verdict ? data.evidence_verdict === test.expected.evidence_verdict : true;
             let severityMatch = test.expected.severity ? data.severity === test.expected.severity : true;
