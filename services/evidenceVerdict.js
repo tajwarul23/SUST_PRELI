@@ -13,43 +13,45 @@ const VERDICTS = {
 };
 
 const strategies = {
-    /**
-     * Logic: If the matched counterparty appears in prior transactions,
-     * it suggests an established relationship, contradicting a "wrong transfer" claim.
-     */
     wrong_transfer: (matchedTxn, history) => {
         if (!matchedTxn || !matchedTxn.counterparty) return VERDICTS.INSUFFICIENT;
+        if (matchedTxn.type !== 'transfer') return VERDICTS.INCONSISTENT;
+        if (matchedTxn.status !== 'completed') return VERDICTS.INCONSISTENT;
 
         const priorTxns = history.filter(t =>
             t.transaction_id !== matchedTxn.transaction_id &&
-            t.counterparty === matchedTxn.counterparty
+            t.counterparty === matchedTxn.counterparty &&
+            t.status === 'completed'
         );
 
         return priorTxns.length > 0 ? VERDICTS.INCONSISTENT : VERDICTS.CONSISTENT;
     },
 
-    /**
-     * Logic: If a transaction status is 'failed' or 'pending', it supports a failure claim.
-     * If 'completed' but customer claims failure, it's a contradiction.
-     */
     payment_failed: (matchedTxn) => {
         if (!matchedTxn) return VERDICTS.INSUFFICIENT;
         if (['failed', 'pending'].includes(matchedTxn.status)) return VERDICTS.CONSISTENT;
-        if (matchedTxn.status === 'completed') return VERDICTS.INCONSISTENT;
+        if (['completed', 'reversed'].includes(matchedTxn.status)) return VERDICTS.INCONSISTENT;
         return VERDICTS.INSUFFICIENT;
     },
 
     agent_cash_in_issue: (matchedTxn) => {
-        // Shared logic with payment_failed for financial status discrepancies
-        return strategies.payment_failed(matchedTxn);
+        if (!matchedTxn) return VERDICTS.INSUFFICIENT;
+        if (matchedTxn.type !== 'cash_in') return VERDICTS.INCONSISTENT;
+        if (['failed', 'pending'].includes(matchedTxn.status)) return VERDICTS.CONSISTENT;
+        if (['completed', 'reversed'].includes(matchedTxn.status)) return VERDICTS.INCONSISTENT;
+        return VERDICTS.INSUFFICIENT;
     },
 
-    /**
-     * Logic: Look for another transaction with same amount/counterparty within 5 mins.
-     * If found, the second one is the duplicate.
-     */
+    refund_request: (matchedTxn) => {
+        if (!matchedTxn) return VERDICTS.INSUFFICIENT;
+        if (matchedTxn.status === 'completed') return VERDICTS.CONSISTENT;
+        if (['failed', 'pending', 'reversed'].includes(matchedTxn.status)) return VERDICTS.INCONSISTENT;
+        return VERDICTS.INSUFFICIENT;
+    },
+
     duplicate_payment: (matchedTxn, history) => {
         if (!matchedTxn) return VERDICTS.INSUFFICIENT;
+        if (matchedTxn.status !== 'completed') return VERDICTS.INCONSISTENT;
 
         const FIVE_MINS_MS = 5 * 60 * 1000;
         const matchedTime = new Date(matchedTxn.timestamp).getTime();
@@ -58,28 +60,23 @@ const strategies = {
             t.transaction_id !== matchedTxn.transaction_id &&
             t.amount === matchedTxn.amount &&
             t.counterparty === matchedTxn.counterparty &&
+            t.status === 'completed' &&
             Math.abs(new Date(t.timestamp).getTime() - matchedTime) < FIVE_MINS_MS
         );
 
         return duplicate ? VERDICTS.CONSISTENT : VERDICTS.INCONSISTENT;
     },
 
-    /**
-     * Logic: If status is 'pending' and it's a settlement, the claim is consistent.
-     */
     merchant_settlement_delay: (matchedTxn) => {
         if (!matchedTxn) return VERDICTS.INSUFFICIENT;
-        if (matchedTxn.type === 'settlement' && matchedTxn.status === 'pending') {
-            return VERDICTS.CONSISTENT;
-        }
-        return VERDICTS.INCONSISTENT;
+        if (matchedTxn.type !== 'settlement') return VERDICTS.INCONSISTENT;
+        if (['failed', 'pending'].includes(matchedTxn.status)) return VERDICTS.CONSISTENT;
+        if (matchedTxn.status === 'completed') return VERDICTS.INCONSISTENT;
+        return VERDICTS.INSUFFICIENT;
     },
 
-    /**
-     * Logic: Phishing usually doesn't have a specific transaction to 'verify' via status.
-     */
     phishing_or_social_engineering: () => VERDICTS.INSUFFICIENT,
-
+    other: () => VERDICTS.INSUFFICIENT,
     default: () => VERDICTS.INSUFFICIENT
 };
 

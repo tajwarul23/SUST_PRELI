@@ -5,8 +5,10 @@
  * However, they are "stochastic parrots". By providing deterministic 
  * pre-analysis (verdict, matched txn), we ground the LLM in truth.
  */
-
+import dotenv from "dotenv";
+dotenv.config()
 import { GoogleGenerativeAI } from "@google/generative-ai";
+console.log("api==>", process.env.GEMINI_API_KEY);
 
 /**
  * Calls Gemini to perform the nuanced parts of classification.

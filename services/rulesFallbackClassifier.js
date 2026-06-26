@@ -1,61 +1,78 @@
-/**
- * rulesFallbackClassifier.js
- * 
- * Why: High availability is critical. If Gemini is down or slow,
- * we must still provide a structured, sensible response.
- * This uses regex patterns to categorize the complaint.
- */
-
 import { getVerdict } from './evidenceVerdict.js';
 import { matchTransactions } from './transactionMatcher.js';
 
 const CASE_PATTERNS = [
     {
+        type: 'phishing_or_social_engineering',
+        patterns: [
+            /(otp|pin|password|won prize|unknown call|lottery|scam|block.*account)/i,
+            /(পিন|ওটিপি|পাসওয়ার্ড|পুরস্কার|অপরিচিত কল|লটারি|স্ক্যাম)/
+        ],
+        department: 'fraud_risk',
+        severity: 'critical'
+    },
+    {
+        type: 'duplicate_payment',
+        patterns: [
+            /(twice|double|multiple times|two times|2 times|second time)/i,
+            /(দুইবার|২ বার|বারবার|দ্বিগুণ)/
+        ],
+        department: 'payments_ops',
+        severity: 'medium'
+    },
+    {
+        type: 'merchant_settlement_delay',
+        patterns: [
+            /(settle|settlement|sales.*not.*settle)/i,
+            /(সেটেলমেন্ট|সেটেল)/
+        ],
+        department: 'merchant_operations',
+        severity: 'medium'
+    },
+    {
+        type: 'agent_cash_in_issue',
+        patterns: [
+            /(cash in|cash-in)/i,
+            /(ক্যাশ ইন)/
+        ],
+        department: 'agent_operations',
+        severity: 'high'
+    },
+    {
         type: 'wrong_transfer',
-        patterns: [/(wrong|mistake).*(number|transfer|account)/i, /ভুল.*(নাম্বার|নম্বর|অ্যাকাউন্ট|পাঠিয়েছি)/],
+        patterns: [
+            /wrong.*(number|transfer|account|person|recipient|someone|friend|brother|sister)/i,
+            /mistake.*(number|transfer|account|person|recipient|someone|friend|brother|sister)/i,
+            /ভুল.*(নাম্বার|নম্বর|অ্যাকাউন্ট|পাঠিয়েছি|ব্যক্তি|মানুষ)/,
+            /(sent|transfer).*to.*(brother|friend|sister|father|mother|relative|someone|number|person).*(not|n't|didn't).*(receive|get|arrive)/i
+        ],
         department: 'dispute_resolution',
         severity: 'medium'
     },
     {
         type: 'payment_failed',
-        patterns: [/(failed|not.*go|stuck|deducted|did.*not)/i, /(ব্যর্থ|হয়নি|কেটে|অসফল)/],
+        patterns: [
+            /(failed|not.*go|stuck|deducted|did.*not|error|declined)/i,
+            /(ব্যর্থ|হয়নি|কেটে|অসফল|ব্যালেন্স)/
+        ],
         department: 'payments_ops',
         severity: 'high'
     },
     {
-        type: 'duplicate_payment',
-        patterns: [/(twice|double|multiple times)/i, /(দুইবার|২ বার|বারবার)/],
-        department: 'payments_ops',
-        severity: 'medium'
-    },
-    {
-        type: 'phishing_or_social_engineering',
-        patterns: [/(otp|pin|password|won prize|unknown call)/i, /(পিন|ওটিপি|পাসওয়ার্ড|পুরস্কার|অপরিচিত কল)/],
-        department: 'fraud_risk',
-        severity: 'critical'
-    },
-    {
-        type: 'agent_cash_in_issue',
-        patterns: [/(agent|cash in|shop)/i, /(এজেন্ট|ক্যাশ ইন|দোকান)/],
-        department: 'agent_operations',
-        severity: 'high'
-    },
-    {
-        type: 'merchant_settlement_delay',
-        patterns: [/(settlement|merchant pay|delay)/i, /(সেটেলমেন্ট|মার্চেন্ট পে|দেরি)/],
-        department: 'merchant_operations',
-        severity: 'medium'
+        type: 'refund_request',
+        patterns: [
+            /(refund|money back|return.*money|changed.*mind|don't.*want|do not want)/i,
+            /(ফেরত|রিফান্ড)/
+        ],
+        department: 'customer_support',
+        severity: 'low'
     }
 ];
 
-/**
- * Fallback classifier that doesn't rely on LLMs.
- */
 function classifyFallback(ticketData) {
     const { complaint, transaction_history, language } = ticketData;
 
     let matchedCase = null;
-    // Walk through our pattern list. The first one to match "wins".
     for (const item of CASE_PATTERNS) {
         if (item.patterns.some(p => p.test(complaint))) {
             matchedCase = item;
@@ -66,13 +83,11 @@ function classifyFallback(ticketData) {
     const caseType = matchedCase ? matchedCase.type : 'other';
     const candidates = matchTransactions(complaint, transaction_history);
 
-    // Logic: If candidates are ambiguous (2+ with same score), treat as insufficient
     const bestMatch = (candidates.length === 1 || (candidates.length > 1 && candidates[0].matchScore > candidates[1].matchScore))
         ? candidates[0]
         : null;
 
     const verdict = getVerdict(caseType, bestMatch, transaction_history);
-
     const isBangla = language === 'bn';
 
     return {
