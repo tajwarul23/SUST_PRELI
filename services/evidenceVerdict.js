@@ -1,10 +1,4 @@
-/**
- * evidenceVerdict.js
- * 
- * Why: Verification of claims against system data should be deterministic.
- * This logic is graded precisely, so using a rule-based approach ensures
- * explainable and consistent results that an LLM might hallucinate on.
- */
+
 
 const VERDICTS = {
     CONSISTENT: 'consistent',
@@ -80,18 +74,9 @@ const strategies = {
     default: () => VERDICTS.INSUFFICIENT
 };
 
-/**
- * getVerdict(caseType, matchedTxn, history)
- * 
- * DESIGN DECISION: Deterministic Verdicts (Strategy Pattern)
- * Why: We don't use a giant 'if/else' chain. Instead, we map each 'case_type' 
- * to a specific function. This makes the logic:
- * 1. Clean: Each case has its own small, readable function.
- * 2. Reliable: Machines are better than LLMs at comparing specific numbers/statuses.
- * 3. Extensible: To add a new case, we just add a key to the 'strategies' object.
- */
+
 function getVerdict(caseType, matchedTxn, history) {
-    // If we don't have a specific strategy for a case_type, we use the default.
+    
     const strategy = strategies[caseType] || strategies.default;
     return strategy(matchedTxn, history);
 }
